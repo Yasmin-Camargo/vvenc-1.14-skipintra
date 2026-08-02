@@ -3,9 +3,6 @@
 #include "CommonDef.h"
 #include <atomic>
 
-// 1 = Enable Early Skip via ML | 0 = Original VVenC (Baseline)
-#define ML_SKIP_INTRA 1
-
 namespace vvenc {
 
 class CodingStructure;
@@ -23,6 +20,13 @@ public:
     static void incrementTotalEval() { countTotalEval++; }
 
     static void printSummary();
+
+    static inline bool isSkipEnabled() {
+        if (const char* env_p = std::getenv("ML_SKIP_INTRA")) {
+            return std::string(env_p) == "1";
+        }
+        return true;
+    }
 };
 
 } // namespace vvenc

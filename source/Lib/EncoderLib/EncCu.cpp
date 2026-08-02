@@ -1570,17 +1570,20 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
   tempCS->interHad    = m_modeCtrl.comprCUCtx->interHad;
   double maxCostAllowedForChroma = MAX_DOUBLE;
 
-#if ML_SKIP_INTRA
-      bool skip = vvenc::MLApproxModel::evaluateSkipIntra( *tempCS, cu, bestCS->cost );
-      if (skip)
-      {
-          tempCS->cost = MAX_DOUBLE;
-          tempCS->costDbOffset = 0;
-          return; 
-      }
-#else
-      vvenc::MLApproxModel::incrementTotalEval();
-#endif
+  if ( vvenc::MLApproxModel::isSkipEnabled() )
+    {
+        bool skip = vvenc::MLApproxModel::evaluateSkipIntra( *tempCS, cu, bestCS->cost );
+        if (skip)
+        {
+            tempCS->cost = MAX_DOUBLE;
+            tempCS->costDbOffset = 0;
+            return; 
+        }
+    }
+    else
+    {
+        vvenc::MLApproxModel::incrementTotalEval();
+    }
 
   if( isLuma( partitioner.chType ) )
   {
