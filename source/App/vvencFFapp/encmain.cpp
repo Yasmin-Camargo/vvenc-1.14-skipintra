@@ -65,6 +65,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "vvenc/vvenc.h"
 
+#include "../../Lib/CommonLib/MLFeaturesManager.h"
+
 //! \ingroup EncoderApp
 //! \{
 
@@ -145,6 +147,8 @@ int main(int argc, char* argv[])
 #else
   cpuTimeSec = (endClock - startClock) * 1.0 / CLOCKS_PER_SEC;
 #endif
+
+  vvenc::MLFeaturesManager::finish();
 
   msgApp( VVENC_INFO, "\nvvencFFapp [info]: finished @ %s", std::ctime(&endTime2) );
   msgApp( VVENC_INFO, "vvencFFapp [info]: Total Time: %12.3f sec. [cpu] %12.3f sec. [elapsed]\n", cpuTimeSec, encTime / 1000.0);

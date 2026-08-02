@@ -60,6 +60,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "CommonLib/TimeProfiler.h"
 #include "CommonLib/SearchSpaceCounter.h"
 
+#include "MLApproxModel.h"
+
 #include <mutex>
 #include <cmath>
 #include <algorithm>
@@ -1567,6 +1569,19 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
 
   tempCS->interHad    = m_modeCtrl.comprCUCtx->interHad;
   double maxCostAllowedForChroma = MAX_DOUBLE;
+
+#if ML_SKIP_INTRA
+      bool skip = vvenc::MLApproxModel::evaluateSkipIntra( *tempCS, cu, bestCS->cost );
+      if (skip)
+      {
+          tempCS->cost = MAX_DOUBLE;
+          tempCS->costDbOffset = 0;
+          return; 
+      }
+#else
+      vvenc::MLApproxModel::incrementTotalEval();
+#endif
+
   if( isLuma( partitioner.chType ) )
   {
     if (!tempCS->slice->isIntra() && bestCS)
