@@ -19,7 +19,11 @@ std::atomic<long long> MLApproxModel::countTotalEval{0};
 std::atomic<long long> MLApproxModel::countIsSplit{0};
 std::atomic<long long> MLApproxModel::countNotIntraKept{0};
 std::atomic<long long> MLApproxModel::countLossless{0};
-std::atomic<long long> countFeatureExtractionTimeUs{0}; // Us = Microseconds
+
+std::atomic<long long> countFeatureExtractionTimeUs{0}; 
+std::atomic<long long> countTimeIsSplitUs{0};
+std::atomic<long long> countTimeIntraKeptUs{0};
+std::atomic<long long> MLApproxModel::countTimeIntraSearchUs{0};
 
 namespace
 {
@@ -63,42 +67,75 @@ std::vector<double> buildIntraKeptVector( const MLFeatureData& data )
 
 bool MLApproxModel::evaluateSkipIntra( const CodingStructure& cs, const CodingUnit& cu, double interCost )
 {
-    if( cs.slice->isIntra() || cu.chType == vvenc::CH_C )
+    if ( cs.slice->isIntra() || cu.chType == vvenc::CH_C ) 
     {
-        return false;
+        return false; 
     }
 
+    bool useIsSplit = isIsSplitEnabled();
+    bool useIntraKept = isIntraKeptEnabled();
+
+    if (!useIsSplit && !useIntraKept) {
+        return false;
+    }
     //return true; // Test: skipping the intra-search for all evaluated blocks
 
     countTotalEval++;
 
-    auto start = std::chrono::high_resolution_clock::now();
-
+    auto startFeat = std::chrono::high_resolution_clock::now();
     MLFeatureData featData = MLFeaturesManager::extractFeatures(cs, cu, interCost);
+    auto endFeat = std::chrono::high_resolution_clock::now();
+    countFeatureExtractionTimeUs += std::chrono::duration_cast<std::chrono::microseconds>(endFeat - startFeat).count();
 
-    auto end = std::chrono::high_resolution_clock::now();
-    countFeatureExtractionTimeUs += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    bool mlDecision = false;
+    int isSplit = 0;
 
-    const auto featuresSplit = buildIsSplitVector( featData );
-    int isSplit = decision_tree_single_mdecision_tree_All_Blocks_issplit( featuresSplit );
-    
-    if (isSplit == 1) 
+    if (useIsSplit)
     {
-        countIsSplit++;
-        return true; 
+        const auto featuresSplit = buildIsSplitVector( featData );
+
+        auto startSplit = std::chrono::high_resolution_clock::now();
+        isSplit = decision_tree_single_mdecision_tree_All_Blocks_issplit( featuresSplit );
+        auto endSplit = std::chrono::high_resolution_clock::now();
+        countTimeIsSplitUs += std::chrono::duration_cast<std::chrono::microseconds>(endSplit - startSplit).count();
+
+        if (isSplit == 1)
+        {
+            countIsSplit++;
+            mlDecision = true;
+        }
+    }
+
+    if (!mlDecision)
+    {
+        if (useIntraKept)
+        {
+            const auto featuresIntra = buildIntraKeptVector(featData);
+
+            auto startIntra = std::chrono::high_resolution_clock::now();
+            int isIntraKept = decision_tree_single_mdecision_tree_All_Blocks_intrakept(featuresIntra);
+            auto endIntra = std::chrono::high_resolution_clock::now();
+            countTimeIntraKeptUs += std::chrono::duration_cast<std::chrono::microseconds>(endIntra - startIntra).count();
+
+            if (isIntraKept == 0)
+            {
+                countNotIntraKept++;
+                mlDecision = true;
+            }
+            else
+            {
+                countLossless++;
+                mlDecision = false;
+            }
+        }
+        else
+        {
+            countLossless++;
+            mlDecision = false; 
+        }
     }
     
-    const auto featuresIntra = buildIntraKeptVector( featData );
-    int isIntraKept = decision_tree_single_mdecision_tree_All_Blocks_intrakept( featuresIntra );
-    
-    if (isIntraKept == 0)
-    {
-        countNotIntraKept++;
-        return true; 
-    }
-
-    countLossless++;
-    return false;
+    return mlDecision;
 }
 
 void MLApproxModel::printSummary()
@@ -118,15 +155,31 @@ void MLApproxModel::printSummary()
     double pctLossless = (countLossless * 100.0) / countTotalEval;
     double pctTotalSkipped = pctSplit + pctNotIntra;
 
+    double timeFeatMs = countFeatureExtractionTimeUs / 1000.0;
+    double timeSplitMs = countTimeIsSplitUs / 1000.0;
+    double timeIntraMs = countTimeIntraKeptUs / 1000.0;
+    double totalTimeMs = timeFeatMs + timeSplitMs + timeIntraMs;
+    double timeIntraSearchMs = countTimeIntraSearchUs / 1000.0;
+
     std::cout << std::fixed << std::setprecision(2);
+    std::cout << "-------------------------------------------------------\n";
+    std::cout << "Model Status:\n";
+    std::cout << " -> IsSplit Model      : " << (isIsSplitEnabled() ? "ON" : "OFF") << "\n";
+    std::cout << " -> IntraKept Model    : " << (isIntraKeptEnabled() ? "ON" : "OFF") << "\n";
     std::cout << "-------------------------------------------------------\n";
     std::cout << "Total Blocks Evaluated    : " << countTotalEval << " (100.00%)\n";
     std::cout << " -> Skipped Intra (IsSplit): " << countIsSplit << " (" << pctSplit << "%)\n";
     std::cout << " -> Skipped Intra (!Intra) : " << countNotIntraKept << " (" << pctNotIntra << "%)\n";
     std::cout << " -> Evaluated Intra (Kept) : " << countLossless << " (" << pctLossless << "%)\n";
     std::cout << "-------------------------------------------------------\n";
+    std::cout << "Time Report (ms):\n";
+    std::cout << " -> Feature Extraction     : " << timeFeatMs << " ms\n";
+    std::cout << " -> IsSplit Model Inference: " << timeSplitMs << " ms\n";
+    std::cout << " -> IntraKept Model Infer. : " << timeIntraMs << " ms\n";
+    std::cout << " -> TOTAL INTRA-SEARCH TIME: " << timeIntraSearchMs << " ms\n";
+    std::cout << " -> TOTAL ML OVERHEAD      : " << totalTimeMs << " ms\n";
+    std::cout << "-------------------------------------------------------\n";
     std::cout << "Summary: " << pctTotalSkipped << "% of the blocks skipped the Intra search.\n";
-    std::cout << " -> Total time for feature extraction: " << (countFeatureExtractionTimeUs / 1000.0) << " ms\n";
     std::cout << "=======================================================\n";
 }
 

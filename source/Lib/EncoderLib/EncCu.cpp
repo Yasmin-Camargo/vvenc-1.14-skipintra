@@ -65,6 +65,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <mutex>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 
 //! \ingroup EncoderLib
 //! \{
@@ -1521,6 +1522,8 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
 {
   PROFILER_SCOPE_AND_STAGE_EXT( 1, _TPROF, P_INTRA, tempCS, partitioner.chType );
 
+  auto startIntraTotal = std::chrono::high_resolution_clock::now();
+
   tempCS->initStructData( encTestMode.qp, false ); // clear motion buffer
 
   CodingUnit &cu      = tempCS->addCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType, partitioner.treeType ), partitioner.chType );
@@ -1577,6 +1580,10 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
         {
             tempCS->cost = MAX_DOUBLE;
             tempCS->costDbOffset = 0;
+
+            auto endIntraTotal = std::chrono::high_resolution_clock::now();
+            vvenc::MLApproxModel::addTimeIntraSearch(std::chrono::duration_cast<std::chrono::microseconds>(endIntraTotal - startIntraTotal).count());
+
             return; 
         }
     }
@@ -1672,6 +1679,9 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
 
   STAT_COUNT_CU_MODES( partitioner.chType == CH_L, g_cuCounters1D[CU_MODES_TESTED][0][!tempCS->slice->isIntra() + tempCS->slice->depth] );
   STAT_COUNT_CU_MODES( partitioner.chType == CH_L && !tempCS->slice->isIntra(), g_cuCounters2D[CU_MODES_TESTED][Log2( tempCS->area.lheight() )][Log2( tempCS->area.lwidth() )] );
+
+  auto endIntraTotalFinal = std::chrono::high_resolution_clock::now();
+  vvenc::MLApproxModel::addTimeIntraSearch(std::chrono::duration_cast<std::chrono::microseconds>(endIntraTotalFinal - startIntraTotal).count());
 }
 
 void EncCu::xCheckDQP( CodingStructure& cs, Partitioner& partitioner, bool bKeepCtx )
