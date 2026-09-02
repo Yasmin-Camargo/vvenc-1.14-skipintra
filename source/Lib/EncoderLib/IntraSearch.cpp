@@ -56,6 +56,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "CommonLib/Reshape.h"
 #include <math.h>
 #include "vvenc/vvencCfg.h"
+#include "MLApproxModel.h"
 
 //! \ingroup EncoderLib
 //! \{
@@ -205,6 +206,8 @@ void IntraSearch::xEstimateLumaRdModeList(int& numModesForFullRD,
 
   CPelBuf piOrg   = cu.cs->getOrgBuf(COMP_Y);
   PelBuf piPred  = m_SortedPelUnitBufs->getTestBuf(COMP_Y);
+
+  MLApproxModel::incrementIntraBlocks( true, cu.slice->TLayer == 0 );
 
   const ReshapeData& reshapeData = cu.cs->picture->reshapeData;
   if (cu.cs->picHeader->lmcsEnabled && reshapeData.getCTUFlag())
@@ -734,6 +737,8 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit& cu, Partitioner& partitioner
   uint32_t   uiBestMode = 0;
   Distortion uiBestDist = 0;
   double     dBestCost  = MAX_DOUBLE;
+
+  MLApproxModel::incrementIntraBlocks( false, false );
 
   //----- init mode list ----
   {

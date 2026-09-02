@@ -719,6 +719,7 @@ void xCheckFastCuChromaSplitting( CodingStructure*& tempCS, CodingStructure*& be
 
 void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner )
 {
+  vvenc::MLApproxModel::incrementGlobalTotalBlocks();
   const Area& lumaArea = tempCS->area.Y();
 
   Slice&   slice      = *tempCS->slice;
@@ -1096,6 +1097,27 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   CHECK( bestCS->cus.empty()                                   , "No possible encoding found" );
   CHECK( bestCS->cus[0]->predMode == NUMBER_OF_PREDICTION_MODES, "No possible encoding found" );
   CHECK( bestCS->cost             == MAX_DOUBLE                , "No possible encoding found" );
+
+  if( !bestCS->cus.empty() )
+  {
+      const bool keptWhole =
+          ( bestCS->cus.size() == 1 )
+          && ( bestCS->cus[0]->Y() == bestCS->area.Y() );
+
+      if( isLuma( partitioner.chType ) )
+      {
+          if( keptWhole && bestCS->cus[0]->predMode == MODE_INTRA )
+              MLApproxModel::incrementFinalIntraKept();
+          else if( !keptWhole )
+              MLApproxModel::incrementFinalSplit();
+          else
+              MLApproxModel::incrementFinalOther();
+      }
+      else
+      {
+          MLApproxModel::incrementFinalNonLuma();
+      }
+  }
 }
 
 
