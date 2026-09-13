@@ -1609,10 +1609,6 @@ void EncCu::xCheckRDCostIntra( CodingStructure *&tempCS, CodingStructure *&bestC
             return; 
         }
     }
-    else
-    {
-        vvenc::MLApproxModel::incrementTotalEval();
-    }
 
   if( isLuma( partitioner.chType ) )
   {

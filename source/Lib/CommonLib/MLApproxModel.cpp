@@ -224,6 +224,11 @@ void MLApproxModel::printSummary()
     }
     std::cout << "-------------------------------------------------------\n";
 
+    double pctSplit = countTotalEval > 0 ? (countIsSplit * 100.0) / countTotalEval : 0.0;
+    double pctNotIntra = countTotalEval > 0 ? (countNotIntraKept * 100.0) / countTotalEval : 0.0;
+    double pctLossless = countTotalEval > 0 ? (countLossless * 100.0) / countTotalEval : 0.0;
+    double pctTotalSkipped = pctSplit + pctNotIntra;
+
     if (countTotalEval == 0) {
         if (!masterEnabled) {
             std::cout << "ML models disabled via ML_SKIP_INTRA=0 (Baseline Mode).\n";
@@ -232,14 +237,8 @@ void MLApproxModel::printSummary()
         } else {
             std::cout << "No blocks were evaluated by the ML models.\n";
         }
-        std::cout << "=======================================================\n";
-        return;
+        std::cout << "-------------------------------------------------------\n";
     }
-
-    double pctSplit = (countIsSplit * 100.0) / countTotalEval;
-    double pctNotIntra = (countNotIntraKept * 100.0) / countTotalEval;
-    double pctLossless = (countLossless * 100.0) / countTotalEval;
-    double pctTotalSkipped = pctSplit + pctNotIntra;
 
     double timeFeatMs = countFeatureExtractionTimeUs / 1000.0;
     double timeSplitMs = countTimeIsSplitUs / 1000.0;
@@ -248,7 +247,7 @@ void MLApproxModel::printSummary()
     double timeIntraSearchMs = countTimeIntraSearchUs / 1000.0;
 
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "Total Blocks Filtered by ML (Eval) : " << countTotalEval << " (100.00%)\n";
+    std::cout << "Total Blocks Filtered by ML (Eval) : " << countTotalEval << (countTotalEval > 0 ? " (100.00%)\n" : " (0.00%)\n");
     std::cout << " -> Skipped Intra (IsSplit): " << countIsSplit << " (" << pctSplit << "%)\n";
     std::cout << " -> Skipped Intra (!Intra) : " << countNotIntraKept << " (" << pctNotIntra << "%)\n";
     std::cout << " -> Evaluated Intra (Kept) : " << countLossless << " (" << pctLossless << "%)\n";
